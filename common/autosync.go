@@ -1,15 +1,10 @@
 package common
 
 import (
-	"errors"
-
 	"github.com/gen2brain/beeep"
 	"github.com/ztrue/tracerr"
 )
 
-// Fixed order: fetch → rebase → commit → push
-// This ensures commits are always based on the latest remote state,
-// preventing ref mismatch errors when multiple devices sync.
 func AutoSync(repoConfig RepoConfig) error {
 	var err error
 	err = ensureGitAuthor(repoConfig)
@@ -17,32 +12,31 @@ func AutoSync(repoConfig RepoConfig) error {
 		return tracerr.Wrap(err)
 	}
 
-	// 1. Fetch latest from remote first
-	err = fetch(repoConfig)
+	// Pull with rebase and autostash - handles:
+	// 1. Fetching remote changes
+	// 2. Stashing any uncommitted local changes
+	// 3. Rebasing any local commits onto remote
+	// 4. Restoring stashed changes
+	_, err = GitCommand(repoConfig, []string{"pull", "--rebase", "--autostash"})
 	if err != nil {
-		return tracerr.Wrap(err)
-	}
-
-	// 2. Rebase local changes onto latest remote
-	err = rebase(repoConfig)
-	if err != nil {
-		if errors.Is(err, errRebaseFailed) {
-			repoPath := repoConfig.RepoPath
-			err := beeep.Alert("Git Auto Sync - Conflict", "Could not rebase for - "+repoPath, "assets/warning.png")
-			if err != nil {
-				return tracerr.Wrap(err)
-			}
+		// Check if it's a conflict
+		repoPath := repoConfig.RepoPath
+		rebasing, _ := isRebasing(repoPath)
+		if rebasing {
+			GitCommand(repoConfig, []string{"rebase", "--abort"})
+			beeep.Alert("Git Auto Sync - Conflict", "Could not rebase for - "+repoPath, "")
+			return errRebaseFailed
 		}
 		return tracerr.Wrap(err)
 	}
 
-	// 3. Commit new changes (now based on latest remote state)
+	// Commit any new local changes
 	err = commit(repoConfig)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
 
-	// 4. Push
+	// Push
 	err = push(repoConfig)
 	if err != nil {
 		return tracerr.Wrap(err)
