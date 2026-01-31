@@ -7,7 +7,9 @@ import (
 	"github.com/ztrue/tracerr"
 )
 
-// FIXME: Add logs for when we commit, pull, and push
+// Fixed order: fetch → rebase → commit → push
+// This ensures commits are always based on the latest remote state,
+// preventing ref mismatch errors when multiple devices sync.
 func AutoSync(repoConfig RepoConfig) error {
 	var err error
 	err = ensureGitAuthor(repoConfig)
@@ -15,16 +17,13 @@ func AutoSync(repoConfig RepoConfig) error {
 		return tracerr.Wrap(err)
 	}
 
-	err = commit(repoConfig)
-	if err != nil {
-		return tracerr.Wrap(err)
-	}
-
+	// 1. Fetch latest from remote first
 	err = fetch(repoConfig)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
 
+	// 2. Rebase local changes onto latest remote
 	err = rebase(repoConfig)
 	if err != nil {
 		if errors.Is(err, errRebaseFailed) {
@@ -34,19 +33,20 @@ func AutoSync(repoConfig RepoConfig) error {
 				return tracerr.Wrap(err)
 			}
 		}
-		// How should we continue?
-		// - Keep sending the notification each time?
-		// - Or something a bit better?
 		return tracerr.Wrap(err)
 	}
 
-	err = push(repoConfig)
+	// 3. Commit new changes (now based on latest remote state)
+	err = commit(repoConfig)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
 
-	// -> do a merge
-	// -> push the changes
+	// 4. Push
+	err = push(repoConfig)
+	if err != nil {
+		return tracerr.Wrap(err)
+	}
 
 	return nil
 }
