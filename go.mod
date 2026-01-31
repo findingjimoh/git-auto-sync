@@ -1,4 +1,4 @@
-module github.com/GitJournal/git-auto-sync
+module github.com/findingjimoh/git-auto-sync
 
 go 1.18
 

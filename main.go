@@ -9,7 +9,7 @@ import (
 	cli "github.com/urfave/cli/v2"
 	"github.com/ztrue/tracerr"
 
-	"github.com/GitJournal/git-auto-sync/common"
+	"github.com/findingjimoh/git-auto-sync/common"
 )
 
 var version = "dev"

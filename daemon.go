@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/GitJournal/git-auto-sync/common"
-	cfg "github.com/GitJournal/git-auto-sync/common/config"
+	"github.com/findingjimoh/git-auto-sync/common"
+	cfg "github.com/findingjimoh/git-auto-sync/common/config"
 	cli "github.com/urfave/cli/v2"
 	"github.com/ztrue/tracerr"
 	"golang.org/x/exp/slices"

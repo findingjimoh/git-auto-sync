@@ -5,8 +5,8 @@ import (
 	"log"
 	"sync"
 
-	"github.com/GitJournal/git-auto-sync/common"
-	cfg "github.com/GitJournal/git-auto-sync/common/config"
+	"github.com/findingjimoh/git-auto-sync/common"
+	cfg "github.com/findingjimoh/git-auto-sync/common/config"
 	"github.com/kardianos/service"
 )
 
