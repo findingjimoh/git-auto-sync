@@ -106,22 +106,16 @@ func GitCommand(repoConfig RepoConfig, args []string) (bytes.Buffer, error) {
 }
 
 func toEnvString(repoConfig RepoConfig) []string {
-	vals := repoConfig.Env
-	vals = append(vals, repoConfig.Env...)
-
-	// Pass through essential environment variables that git needs
-	essentialVars := []string{"HOME", "PATH", "USER", "TMPDIR", "TERM"}
+	if len(repoConfig.Env) == 0 {
+		return os.Environ()
+	}
+	vals := append([]string{}, repoConfig.Env...)
 	for _, s := range os.Environ() {
-		parts := strings.Split(s, "=")
-		k := parts[0]
-		for _, essential := range essentialVars {
-			if k == essential {
-				vals = append(vals, s)
-				break
-			}
+		parts := strings.SplitN(s, "=", 2)
+		if parts[0] == "HOME" {
+			vals = append(vals, s)
 		}
 	}
-
 	return vals
 }
 

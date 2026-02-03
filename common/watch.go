@@ -84,12 +84,12 @@ func WatchForChanges(cfg RepoConfig) error {
 	go func() {
 		notifier, err := NewAwakeNotifier()
 		if err != nil {
-			log.Fatalln(err)
+			log.Println(err)
 		}
 
 		err = notifier.Start(notifyFilteredChannel)
 		if err != nil {
-			log.Fatalln(err)
+			log.Println(err)
 		}
 
 		for {
@@ -105,14 +105,14 @@ func WatchForChanges(cfg RepoConfig) error {
 
 				err := AutoSync(cfg)
 				if err != nil {
-					log.Fatalln(err)
+					log.Println(err)
 				}
 				continue
 
 			case <-pollTicker.C:
 				err := AutoSync(cfg)
 				if err != nil {
-					log.Fatalln(err)
+					log.Println(err)
 				}
 			}
 		}
