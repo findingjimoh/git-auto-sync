@@ -59,6 +59,19 @@ to inform you of the conflict.
 It currently ignores all hidden files, files ignored by git, and additional temporary swap files
 created by vim, emacs and similar editors.
 
+## Fork Changes (`findingjimoh/git-auto-sync`)
+
+This is a fork of [`GitJournal/git-auto-sync`](https://github.com/GitJournal/git-auto-sync) with the following fixes:
+
+### Environment inheritance fix (`common/commit.go`)
+Upstream stripped all environment variables except `HOME` from git subprocesses. This broke tools like `git-crypt` that need to be in PATH. Fixed `toEnvString()` to inherit the full parent process environment when no custom env is configured (the default for daemon/watcher mode). When custom env IS set (via `--env` flag), it merges with the parent's HOME as before. Also fixed a double-append bug introduced in upstream commit `50cb029` that duplicated every custom env var.
+
+### Error resilience fix (`common/watch.go`)
+Upstream used `log.Fatalln()` in the watch loop error handlers, which killed the entire process when any single repo failed to sync. Changed to `log.Println()` so errors are logged and the watcher retries on the next event or poll cycle, rather than crashing monitoring for all repos.
+
+### Explicit remote/branch in pull (`common/autosync.go`)
+Changed `git pull --rebase --autostash` to `git pull --rebase --autostash origin main` to avoid "Cannot rebase onto multiple branches" errors when `FETCH_HEAD` contains entries from multiple fetch operations.
+
 ## Similar Projects
 
 - [Obsidian Git](https://github.com/denolehov/obsidian-git)
