@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"log"
 	"os"
 	"os/exec"
 	"sort"
@@ -47,11 +48,12 @@ func commit(repoConfig RepoConfig) error {
 			continue
 		}
 
-		hasChanges = true
 		_, err = GitCommand(repoConfig, []string{"add", "--", filePath})
 		if err != nil {
-			return tracerr.Wrap(err)
+			log.Printf("git add skipped: %s (%v)", filePath, err)
+			continue
 		}
+		hasChanges = true
 
 		commitMsg = append(commitMsg, statusCode+" "+filePath)
 	}
