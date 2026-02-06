@@ -92,7 +92,7 @@ func GitCommand(repoConfig RepoConfig, args []string) (bytes.Buffer, error) {
 
 	if err != nil {
 		fullCmd := "git " + strings.Join(args, " ")
-		err := tracerr.Errorf("%w: Command: %s\nEnv: %s\nStdOut: %s\nStdErr: %s", err, fullCmd, statusCmd.Env, outb.String(), errb.String())
+		err := tracerr.Errorf("%w: Command: %s\nStdOut: %s\nStdErr: %s", err, fullCmd, outb.String(), errb.String())
 		return outb, err
 	}
 	return outb, nil

@@ -21,14 +21,11 @@ func lockPath(repoPath string) string {
 func AutoSync(repoConfig RepoConfig) error {
 	// Shared lock file with git-auto-pull.sh to prevent concurrent git operations
 	lock := lockPath(repoConfig.RepoPath)
-	if _, err := os.Stat(lock); err == nil {
-		// Lock held by pull script, skip this cycle
-		return nil
-	}
 	os.MkdirAll(filepath.Dir(lock), 0755)
-	f, err := os.Create(lock)
+	f, err := os.OpenFile(lock, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 	if err != nil {
-		return tracerr.Wrap(err)
+		// Lock held by pull script (or stale) — skip this cycle
+		return nil
 	}
 	f.Close()
 	defer os.Remove(lock)
@@ -51,7 +48,12 @@ func AutoSync(repoConfig RepoConfig) error {
 	}
 
 	if bi.UpstreamBranch != "" && bi.UpstreamRemote != "" {
-		_, err = GitCommand(repoConfig, []string{"pull", "--rebase", bi.UpstreamRemote, bi.UpstreamBranch})
+		_, err = GitCommand(repoConfig, []string{"fetch", bi.UpstreamRemote})
+		if err != nil {
+			return tracerr.Wrap(err)
+		}
+
+		_, err = GitCommand(repoConfig, []string{"rebase", bi.UpstreamRemote + "/" + bi.UpstreamBranch})
 		if err != nil {
 			repoPath := repoConfig.RepoPath
 			rebasing, _ := isRebasing(repoPath)
