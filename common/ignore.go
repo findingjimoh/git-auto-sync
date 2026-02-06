@@ -60,7 +60,16 @@ func isFileIgnoredByGit(repoPath string, filePath string) (bool, error) {
 	patterns = append(patterns, w.Excludes...)
 	m := gitignore.NewMatcher(patterns)
 
-	return m.Match([]string{filePath}, false), err
+	relativePath := filePath
+	if filepath.IsAbs(filePath) {
+		relativePath = filePath[len(repoPath)+1:]
+	}
+	pathComponents := strings.Split(relativePath, string(filepath.Separator))
+
+	fi, statErr := os.Stat(filePath)
+	isDir := statErr == nil && fi.IsDir()
+
+	return m.Match(pathComponents, isDir), nil
 }
 
 func isEmptyFile(filePath string) (bool, error) {

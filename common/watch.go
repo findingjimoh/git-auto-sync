@@ -74,7 +74,7 @@ func WatchForChanges(cfg RepoConfig) error {
 
 	err = AutoSync(cfg)
 	if err != nil {
-		return tracerr.Wrap(err)
+		log.Println("Initial sync failed, will retry on next change/poll:", err)
 	}
 
 	notifyFilteredChannel := make(chan bool, 100)
@@ -133,7 +133,8 @@ func WatchForChanges(cfg RepoConfig) error {
 		ei := <-notifyChannel
 		ignore, err := ShouldIgnoreFile(repoPath, ei.Path())
 		if err != nil {
-			return tracerr.Wrap(err)
+			log.Println("ShouldIgnoreFile error, skipping event:", err)
+			continue
 		}
 		if ignore {
 			continue
