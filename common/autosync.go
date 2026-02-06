@@ -1,47 +1,71 @@
 package common
 
 import (
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/gen2brain/beeep"
 	"github.com/ztrue/tracerr"
 )
 
+// lockPath returns the shared lock file path for a repo, matching the format
+// used by git-auto-pull.sh: ~/.cache/git-sync-{repo with / replaced by -}.lock
+func lockPath(repoPath string) string {
+	cacheDir := filepath.Join(os.Getenv("HOME"), ".cache")
+	sanitized := strings.ReplaceAll(repoPath, "/", "-")
+	return filepath.Join(cacheDir, "git-sync-"+sanitized+".lock")
+}
+
 func AutoSync(repoConfig RepoConfig) error {
-	var err error
+	// Shared lock file with git-auto-pull.sh to prevent concurrent git operations
+	lock := lockPath(repoConfig.RepoPath)
+	if _, err := os.Stat(lock); err == nil {
+		// Lock held by pull script, skip this cycle
+		return nil
+	}
+	os.MkdirAll(filepath.Dir(lock), 0755)
+	f, err := os.Create(lock)
+	if err != nil {
+		return tracerr.Wrap(err)
+	}
+	f.Close()
+	defer os.Remove(lock)
+
 	err = ensureGitAuthor(repoConfig)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
 
-	// Get upstream branch info
+	// 1. Commit local changes first (no stash needed)
+	err = commit(repoConfig)
+	if err != nil {
+		return tracerr.Wrap(err)
+	}
+
+	// 2. Pull with rebase — our commit gets rebased on top of remote
 	bi, err := fetchBranchInfo(repoConfig.RepoPath)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
 
-	// Pull with rebase and autostash - explicitly specify remote/branch to avoid
-	// "Cannot rebase onto multiple branches" error
 	if bi.UpstreamBranch != "" && bi.UpstreamRemote != "" {
-		_, err = GitCommand(repoConfig, []string{"pull", "--rebase", "--autostash", bi.UpstreamRemote, bi.UpstreamBranch})
+		_, err = GitCommand(repoConfig, []string{"pull", "--rebase", bi.UpstreamRemote, bi.UpstreamBranch})
 		if err != nil {
-			// Check if it's a conflict
 			repoPath := repoConfig.RepoPath
 			rebasing, _ := isRebasing(repoPath)
 			if rebasing {
 				GitCommand(repoConfig, []string{"rebase", "--abort"})
 				beeep.Alert("Git Auto Sync - Conflict", "Could not rebase for - "+repoPath, "")
+				log.Println("Rebase conflict in", repoPath, "- aborted, local commit preserved")
 				return errRebaseFailed
 			}
 			return tracerr.Wrap(err)
 		}
 	}
 
-	// Commit any new local changes
-	err = commit(repoConfig)
-	if err != nil {
-		return tracerr.Wrap(err)
-	}
-
-	// Push
+	// 3. Push
 	err = push(repoConfig)
 	if err != nil {
 		return tracerr.Wrap(err)
