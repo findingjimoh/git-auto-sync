@@ -19,16 +19,16 @@ func lockPath(repoPath string) string {
 }
 
 func AutoSync(repoConfig RepoConfig) error {
-	// Shared lock file with git-auto-pull.sh to prevent concurrent git operations
+	// Shared lock dir with git-auto-pull.sh to prevent concurrent git operations.
+	// Both sides use mkdir (atomic on POSIX — fails if dir already exists).
 	lock := lockPath(repoConfig.RepoPath)
 	os.MkdirAll(filepath.Dir(lock), 0755)
-	f, err := os.OpenFile(lock, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	err := os.Mkdir(lock, 0755)
 	if err != nil {
-		// Lock held by pull script (or stale) — skip this cycle
+		// Lock held by pull script or daemon — skip this cycle
 		return nil
 	}
-	f.Close()
-	defer os.Remove(lock)
+	defer os.RemoveAll(lock)
 
 	err = ensureGitAuthor(repoConfig)
 	if err != nil {
