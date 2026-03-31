@@ -57,7 +57,7 @@ func AutoSync(repoConfig RepoConfig) error {
 			}
 
 			// Rebase
-			_, err = GitCommand(repoConfig, []string{"rebase", bi.UpstreamRemote + "/" + bi.UpstreamBranch})
+			_, err = GitCommand(repoConfig, []string{"rebase", "--autostash", bi.UpstreamRemote + "/" + bi.UpstreamBranch})
 			if err != nil {
 				repoPath := repoConfig.RepoPath
 				rebasing, _ := isRebasing(repoPath)
