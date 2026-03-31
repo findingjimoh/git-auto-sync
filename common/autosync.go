@@ -41,36 +41,56 @@ func AutoSync(repoConfig RepoConfig) error {
 		return tracerr.Wrap(err)
 	}
 
-	// 2. Pull with rebase — our commit gets rebased on top of remote
+	// 2. Fetch, rebase, and push — with retry on push rejection
 	bi, err := fetchBranchInfo(repoConfig.RepoPath)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
 
 	if bi.UpstreamBranch != "" && bi.UpstreamRemote != "" {
-		_, err = GitCommand(repoConfig, []string{"fetch", bi.UpstreamRemote})
-		if err != nil {
-			return tracerr.Wrap(err)
-		}
-
-		_, err = GitCommand(repoConfig, []string{"rebase", bi.UpstreamRemote + "/" + bi.UpstreamBranch})
-		if err != nil {
-			repoPath := repoConfig.RepoPath
-			rebasing, _ := isRebasing(repoPath)
-			if rebasing {
-				GitCommand(repoConfig, []string{"rebase", "--abort"})
-				beeep.Alert("Git Auto Sync - Conflict", "Could not rebase for - "+repoPath, "")
-				log.Println("Rebase conflict in", repoPath, "- aborted, local commit preserved")
-				return errRebaseFailed
+		const maxPushAttempts = 3
+		for attempt := 1; attempt <= maxPushAttempts; attempt++ {
+			// Fetch
+			_, err = GitCommand(repoConfig, []string{"fetch", bi.UpstreamRemote})
+			if err != nil {
+				return tracerr.Wrap(err)
 			}
+
+			// Rebase
+			_, err = GitCommand(repoConfig, []string{"rebase", bi.UpstreamRemote + "/" + bi.UpstreamBranch})
+			if err != nil {
+				repoPath := repoConfig.RepoPath
+				rebasing, _ := isRebasing(repoPath)
+				if rebasing {
+					GitCommand(repoConfig, []string{"rebase", "--abort"})
+					beeep.Alert("Git Auto Sync - Conflict", "Could not rebase for - "+repoPath, "")
+					log.Println("Rebase conflict in", repoPath, "- aborted, local commit preserved")
+					return errRebaseFailed
+				}
+				return tracerr.Wrap(err)
+			}
+
+			// Push
+			err = push(repoConfig)
+			if err == nil {
+				break // Success
+			}
+
+			if attempt < maxPushAttempts {
+				log.Printf("Push attempt %d/%d failed for %s, retrying: %v",
+					attempt, maxPushAttempts, repoConfig.RepoPath, err)
+			} else {
+				log.Printf("Push failed after %d attempts for %s: %v",
+					maxPushAttempts, repoConfig.RepoPath, err)
+				return tracerr.Wrap(err)
+			}
+		}
+	} else {
+		// No upstream — just push (will no-op if no tracking branch)
+		err = push(repoConfig)
+		if err != nil {
 			return tracerr.Wrap(err)
 		}
-	}
-
-	// 3. Push
-	err = push(repoConfig)
-	if err != nil {
-		return tracerr.Wrap(err)
 	}
 
 	return nil
